@@ -41,13 +41,12 @@
         }
 
         #canvas3d-container {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 1;
-        touch-action: none; 
-}
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
 
         /* Clean Minimalist Surface */
         .glass-panel {
@@ -483,14 +482,21 @@
         </div>
     </div>
 
-   <button ontouchstart="setMoveKey('up',true); event.preventDefault();" 
-        ontouchend="setMoveKey('up',false); event.preventDefault();" 
-        class="ui-btn active:bg-amber-400/30 rounded-lg flex items-center justify-center text-sm">▲</button>
+    <!-- MOBILE TOUCH CONTROLS -->
+    <div class="fixed right-2.5 bottom-40 z-20 md:hidden pointer-events-auto flex flex-col gap-1.5">
+        <div class="glass-panel p-1.5 rounded-2xl grid grid-cols-3 gap-1 w-28 h-28">
+            <button onpointerdown="setTurnKey('left',true)" onpointerup="setTurnKey('left',false)" class="ui-btn rounded-lg flex items-center justify-center text-xs font-bold">↺</button>
+            <button onpointerdown="setMoveKey('up',true)" onpointerup="setMoveKey('up',false)" class="ui-btn active:bg-amber-400/30 rounded-lg flex items-center justify-center text-sm">▲</button>
+            <button onpointerdown="setTurnKey('right',true)" onpointerup="setTurnKey('right',false)" class="ui-btn rounded-lg flex items-center justify-center text-xs font-bold">↻</button>
+            <button onpointerdown="setMoveKey('left',true)" onpointerup="setMoveKey('left',false)" class="ui-btn active:bg-amber-400/30 rounded-lg flex items-center justify-center text-sm">◀</button>
+            <button onclick="throwSnowballFPV()" class="ui-btn rounded-lg flex items-center justify-center text-sm" title="Бросить снежок">❄️</button>
+            <button onpointerdown="setMoveKey('right',true)" onpointerup="setMoveKey('right',false)" class="ui-btn active:bg-amber-400/30 rounded-lg flex items-center justify-center text-sm">▶</button>
+            <div></div>
+            <button onpointerdown="setMoveKey('down',true)" onpointerup="setMoveKey('down',false)" class="ui-btn active:bg-amber-400/30 rounded-lg flex items-center justify-center text-sm">▼</button>
+            <button onclick="triggerJump()" class="ui-btn rounded-lg flex items-center justify-center text-[10px] font-medium">Прыг</button>
+        </div>
+    </div>
 
-<!-- Пример для кнопки влево (◀) -->
-<button ontouchstart="setMoveKey('left',true); event.preventDefault();" 
-        ontouchend="setMoveKey('left',false); event.preventDefault();" 
-        class="ui-btn active:bg-amber-400/30 rounded-lg flex items-center justify-center text-sm">◀</button>
     <!-- BOTTOM INVENTORY DOCK -->
     <button id="dock-open-btn" onclick="toggleDock()" class="fixed bottom-2.5 left-1/2 -translate-x-1/2 z-20 glass-panel rounded-full px-4 py-1.5 text-xs font-medium text-slate-200 hover:text-white hidden" title="Открыть панель игрушек [C]">▲ Украшения [C]</button>
     <footer id="bottom-dock" style="transition: transform .25s cubic-bezier(0.22, 1, 0.36, 1);" class="fixed bottom-0 left-0 right-0 z-20 p-2 sm:p-3 pointer-events-none flex flex-col items-center">
@@ -2481,48 +2487,7 @@ setInterval(() => {
                 player.turnKeys.left = player.turnKeys.right = false;
             });
             dom.addEventListener('contextmenu', e => e.preventDefault());
-           dom.addEventListener('touchstart', (e) => {
-                if (e.touches.length > 1) return; // Игнорируем мультитач
-                player.isMouseDragging = true;
-                player.dragMoved = false;
-                player.dragDist = 0;
-                player.prevMouseX = e.touches[0].clientX;
-                player.prevMouseY = e.touches[0].clientY;
-            }, { passive: false });
-
-            dom.addEventListener('touchmove', (e) => {
-                if (!player.isMouseDragging || isAnyModalOpen()) return;
-                e.preventDefault(); // Блокируем скролл и зум
-                
-                const touch = e.touches[0];
-                const dx = touch.clientX - player.prevMouseX;
-                const dy = touch.clientY - player.prevMouseY;
-                
-                player.prevMouseX = touch.clientX;
-                player.prevMouseY = touch.clientY;
-                
-                player.dragDist += Math.abs(dx) + Math.abs(dy);
-                if (player.dragDist > 6) player.dragMoved = true;
-
-                if (player.mode === 'fpv') {
-                    player.yaw -= dx * 0.005; // Чувствительность свайпа
-                    player.pitch = Math.max(-1.3, Math.min(1.3, player.pitch - dy * 0.005));
-                } else {
-                    player.orbitTheta -= dx * 0.008;
-                    player.orbitPhi = Math.max(0.25, Math.min(1.5, player.orbitPhi - dy * 0.008));
-                }
-            }, { passive: false });
-
-            dom.addEventListener('touchend', (e) => {
-                const wasDragging = player.isMouseDragging;
-                player.isMouseDragging = false;
-                if (isAnyModalOpen()) return;
-                if (wasDragging && !player.dragMoved) handleWorldClick();
-            });
-
-            // Существующие pointer-события оставляем для ПК:
             dom.addEventListener('pointerdown', (e) => {
-                if(e.pointerType === 'touch') return; // Избегаем дублирования с touch
                 sound.init();
                 if (e.button === 2) {
                     if (document.pointerLockElement) document.exitPointerLock();
@@ -2532,6 +2497,43 @@ setInterval(() => {
                 player.isMouseDragging = true; player.dragMoved = false; player.dragDist = 0;
                 player.prevMouseX = e.clientX; player.prevMouseY = e.clientY;
             });
+            window.addEventListener('pointermove', (e) => {
+                const r = dom.getBoundingClientRect();
+                mouseNDC.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+                let dx = 0, dy = 0;
+                if (player.isPointerLocked || (player.hoverLook && player.mode === 'fpv' && !e.target.closest('button,select,input,aside,header,footer'))) { dx = e.movementX || 0; dy = e.movementY || 0; }
+                else if (player.isMouseDragging) {
+                    dx = e.clientX - player.prevMouseX; dy = e.clientY - player.prevMouseY;
+                    player.prevMouseX = e.clientX; player.prevMouseY = e.clientY;
+                    player.dragDist = (player.dragDist || 0) + Math.abs(dx) + Math.abs(dy);
+                    if (player.dragDist > 6) player.dragMoved = true;
+                } else return;
+                if (isAnyModalOpen()) return;
+                if (player.mode === 'fpv') {
+                    player.yaw -= dx * 0.0042;
+                    player.pitch = Math.max(-1.3, Math.min(1.3, player.pitch - dy * 0.0042));
+                } else {
+                    player.orbitTheta -= dx * 0.006;
+                    player.orbitPhi = Math.max(0.25, Math.min(1.5, player.orbitPhi - dy * 0.006));
+                }
+            });
+            window.addEventListener('pointerup', (e) => {
+                if (e.button !== 0) return;
+                const was = player.isMouseDragging;
+                player.isMouseDragging = false;
+                if (e.target !== dom || isAnyModalOpen()) return;
+                if (player.mode === 'fpv' && !player.isPointerLocked) { requestPointerLockFPV(); return; }
+                if (was && (!player.dragMoved || player.isPointerLocked)) handleWorldClick();
+            });
+            dom.addEventListener('wheel', (e) => {
+                if (isAnyModalOpen()) return;
+                if (player.mode !== 'fpv') { player.orbitRadius = Math.max(5, Math.min(24, player.orbitRadius + e.deltaY * 0.01)); return; }
+                const now = performance.now();
+                if (now - wheelLock < 90) return;
+                wheelLock = now;
+                cycleOrnament(e.deltaY > 0 ? 1 : -1);
+            }, { passive: true });
+            document.getElementById('proximity-btn').addEventListener('click', interactNearest);
         }
 
         /********************************************************************
